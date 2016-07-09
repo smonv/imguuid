@@ -71,39 +71,6 @@ func main() {
 	defer close(done)
 }
 
-func contentCheck(done <-chan struct{}, paths <-chan string, c chan<- string) {
-	for path := range paths {
-		select {
-		case c <- detectContectType(path):
-		case <-done:
-			return
-		}
-	}
-}
-
-func detectContectType(path string) string {
-	file, err := os.Open(path)
-	if err != nil {
-		return ""
-	}
-	defer file.Close()
-	buf := make([]byte, 512)
-	_, err = file.Read(buf)
-	if err != nil {
-		return ""
-	}
-
-	filetype := http.DetectContentType(buf)
-	switch filetype {
-	case "image/jpeg", "image/jpg":
-		return path
-	case "image/png":
-		return path
-	default:
-	}
-	return ""
-}
-
 func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) {
 	paths := make(chan string)
 	errc := make(chan error, 1)
@@ -127,4 +94,39 @@ func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) 
 	}()
 
 	return paths, errc
+}
+
+func contentCheck(done <-chan struct{}, paths <-chan string, c chan<- string) {
+	for path := range paths {
+		select {
+		case c <- detectContectType(path):
+		case <-done:
+			return
+		}
+	}
+}
+
+func detectContectType(path string) string {
+	file, err := os.Open(path)
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	defer file.Close()
+	buf := make([]byte, 512)
+	_, err = file.Read(buf)
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+
+	filetype := http.DetectContentType(buf)
+	switch filetype {
+	case "image/jpeg", "image/jpg":
+		return path
+	case "image/png":
+		return path
+	default:
+	}
+	return ""
 }
