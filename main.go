@@ -1,14 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"sync"
 )
 
 func main() {
-	defer os.Exit(1)
 	args := os.Args
 
 	if len(args) == 0 {
@@ -34,30 +36,96 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	fmt.Printf("checking %s", root)
-	if err = filepath.Walk(root, walker); err != nil {
+	fmt.Printf("checking %s\n", root)
+
+	done := make(chan struct{})
+	paths, errc := walkFiles(done, root)
+	c := make(chan string)
+
+	checkers := runtime.NumCPU()
+	checkers = 20
+
+	var wg sync.WaitGroup
+	wg.Add(checkers)
+	for i := 0; i < checkers; i++ {
+		go func() {
+			checker(done, paths, c)
+			wg.Done()
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(c)
+	}()
+
+	for p := range c {
+		if len(p) > 0 {
+			fmt.Println(p)
+		}
+	}
+
+	if err := <-errc; err != nil {
 		fmt.Println(err)
+	}
+
+	defer close(done)
+}
+
+func checker(done <-chan struct{}, paths <-chan string, c chan<- string) {
+	for path := range paths {
+		select {
+		case c <- detectContectType(path):
+		case <-done:
+			return
+		}
 	}
 }
 
-func walker(path string, info os.FileInfo, err error) error {
-	if !info.IsDir() {
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		buf := make([]byte, 512)
-		_, err = file.Read(buf)
-		if err != nil {
-			return err
-		}
-
-		filetype := http.DetectContentType(buf)
-		switch filetype {
-		case "image/jpeg", "image/jpg":
-		case "image/png":
-		default:
-		}
+func detectContectType(path string) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return ""
 	}
-	return nil
+	defer file.Close()
+	buf := make([]byte, 512)
+	_, err = file.Read(buf)
+	if err != nil {
+		return ""
+	}
+
+	filetype := http.DetectContentType(buf)
+	switch filetype {
+	case "image/jpeg", "image/jpg":
+		return path
+	case "image/png":
+		return path
+	default:
+	}
+	return ""
+}
+
+func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) {
+	paths := make(chan string)
+	errc := make(chan error, 1)
+
+	go func() {
+		defer close(paths)
+		errc <- filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.Mode().IsRegular() {
+				return nil
+			}
+			select {
+			case paths <- path:
+			case <-done:
+				return errors.New("walker canceled")
+			}
+			return nil
+		})
+	}()
+
+	return paths, errc
 }
