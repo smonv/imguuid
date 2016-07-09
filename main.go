@@ -29,13 +29,13 @@ func main() {
 		return
 	}
 
-	fullPath, err := filepath.Abs(cPath)
+	root, err := filepath.Abs(cPath)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Printf("checking %s", fullPath)
-	if err = filepath.Walk(fullPath, walker); err != nil {
+	fmt.Printf("checking %s", root)
+	if err = filepath.Walk(root, walker); err != nil {
 		fmt.Println(err)
 	}
 }
