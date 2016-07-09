@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 )
 
@@ -42,14 +41,14 @@ func main() {
 	paths, errc := walkFiles(done, root)
 	c := make(chan string)
 
-	checkers := runtime.NumCPU()
-	checkers = 20
+	// workers := runtime.NumCPU()
+	workers := 20
 
 	var wg sync.WaitGroup
-	wg.Add(checkers)
-	for i := 0; i < checkers; i++ {
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
 		go func() {
-			checker(done, paths, c)
+			contentCheck(done, paths, c)
 			wg.Done()
 		}()
 	}
@@ -72,7 +71,7 @@ func main() {
 	defer close(done)
 }
 
-func checker(done <-chan struct{}, paths <-chan string, c chan<- string) {
+func contentCheck(done <-chan struct{}, paths <-chan string, c chan<- string) {
 	for path := range paths {
 		select {
 		case c <- detectContectType(path):
