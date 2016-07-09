@@ -35,6 +35,17 @@ func TestDetectContentType(t *testing.T) {
 	os.Remove(path)
 }
 
+func TestChangeName(t *testing.T) {
+	path := createPNG("testCN.png")
+	newPath := changeName(path)
+
+	_, err := os.Stat(newPath)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	os.Remove(newPath)
+}
+
 func createPNG(filename string) string {
 	path := filepath.Join("/tmp", filename)
 

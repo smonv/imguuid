@@ -6,7 +6,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"sync"
+
+	"github.com/satori/go.uuid"
 )
 
 func main() {
@@ -41,8 +45,7 @@ func main() {
 	paths, errc := walkFiles(done, root)
 	c := make(chan string)
 
-	// workers := runtime.NumCPU()
-	workers := 20
+	workers := runtime.NumCPU()
 
 	var wg sync.WaitGroup
 	wg.Add(workers)
@@ -60,7 +63,10 @@ func main() {
 
 	for p := range c {
 		if len(p) > 0 {
-			fmt.Println(p)
+			newPath := changeName(p)
+			if len(newPath) > 0 {
+				fmt.Printf("%s -> %s\n", p, newPath)
+			}
 		}
 	}
 
@@ -129,4 +135,25 @@ func detectContectType(path string) string {
 	default:
 	}
 	return ""
+}
+
+func changeName(path string) string {
+	basename := filepath.Base(path)
+	fileExt := filepath.Ext(path)
+	fileDir := filepath.Dir(path)
+
+	filename := strings.TrimSuffix(basename, fileExt)
+	_, err := uuid.FromString(filename)
+	if err == nil {
+		return ""
+	}
+	u := uuid.NewV4()
+	newFilename := u.String() + fileExt
+	newPath := filepath.Join(fileDir, newFilename)
+	err = os.Rename(path, newPath)
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+	return newPath
 }
