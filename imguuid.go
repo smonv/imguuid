@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,14 +15,14 @@ import (
 )
 
 func main() {
-	args := os.Args
+	var cPath string
+	flag.StringVar(&cPath, "p", "", "check path")
+	flag.Parse()
 
-	if len(args) == 0 {
-		fmt.Println("Please input path")
+	if len(cPath) == 0 {
+		fmt.Println("Please input path. Use -p flag")
 		return
 	}
-
-	cPath := args[1]
 
 	src, err := os.Stat(cPath)
 	if err != nil {
