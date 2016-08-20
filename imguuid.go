@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"context"
 	"flag"
 	"fmt"
 	"net/http"
@@ -12,6 +12,11 @@ import (
 	"sync"
 
 	"github.com/satori/go.uuid"
+)
+
+var (
+	ctx    context.Context
+	cancel context.CancelFunc
 )
 
 func main() {
@@ -42,8 +47,10 @@ func main() {
 	}
 	fmt.Printf("checking %s\n", root)
 
-	done := make(chan struct{})
-	paths, errc := walkFiles(done, root)
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+
+	paths, errc := walkFiles(ctx, root)
 	c := make(chan string)
 
 	workers := runtime.NumCPU()
@@ -52,7 +59,7 @@ func main() {
 	wg.Add(workers)
 	for i := 0; i < workers; i++ {
 		go func() {
-			contentCheck(done, paths, c)
+			contentCheck(ctx, paths, c)
 			wg.Done()
 		}()
 	}
@@ -74,11 +81,9 @@ func main() {
 	if err := <-errc; err != nil {
 		fmt.Println(err)
 	}
-
-	defer close(done)
 }
 
-func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) {
+func walkFiles(ctx context.Context, root string) (<-chan string, <-chan error) {
 	paths := make(chan string)
 	errc := make(chan error, 1)
 
@@ -93,8 +98,8 @@ func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) 
 			}
 			select {
 			case paths <- path:
-			case <-done:
-				return errors.New("walker canceled")
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 			return nil
 		})
@@ -103,11 +108,11 @@ func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) 
 	return paths, errc
 }
 
-func contentCheck(done <-chan struct{}, paths <-chan string, c chan<- string) {
+func contentCheck(ctx context.Context, paths <-chan string, c chan<- string) {
 	for path := range paths {
 		select {
 		case c <- detectContectType(path):
-		case <-done:
+		case <-ctx.Done():
 			return
 		}
 	}
