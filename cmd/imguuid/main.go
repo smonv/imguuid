@@ -3,14 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"sync"
 
-	"github.com/satori/go.uuid"
+	"github.com/tthanh/imguuid"
 )
 
 var (
@@ -47,7 +45,7 @@ func main() {
 	ctx, cancel = context.WithCancel(context.Background())
 	defer cancel()
 
-	paths, errc := walkFiles(ctx, root)
+	paths, errc := imguuid.WalkFiles(ctx, root)
 	c := make(chan string)
 
 	workers := runtime.NumCPU()
@@ -56,7 +54,7 @@ func main() {
 	wg.Add(workers)
 	for i := 0; i < workers; i++ {
 		go func() {
-			contentCheck(ctx, paths, c)
+			imguuid.ContentCheck(ctx, paths, c)
 			wg.Done()
 		}()
 	}
@@ -68,7 +66,7 @@ func main() {
 
 	for p := range c {
 		if len(p) > 0 {
-			newPath := changeName(p)
+			newPath := imguuid.ChangeName(p)
 			if len(newPath) > 0 {
 				fmt.Printf("%s -> %s\n", p, newPath)
 			}
@@ -78,85 +76,4 @@ func main() {
 	if err := <-errc; err != nil {
 		fmt.Println(err)
 	}
-}
-
-func walkFiles(ctx context.Context, root string) (<-chan string, <-chan error) {
-	paths := make(chan string)
-	errc := make(chan error, 1)
-
-	go func() {
-		defer close(paths)
-		errc <- filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.Mode().IsRegular() {
-				return nil
-			}
-			select {
-			case paths <- path:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-			return nil
-		})
-	}()
-
-	return paths, errc
-}
-
-func contentCheck(ctx context.Context, paths <-chan string, c chan<- string) {
-	for path := range paths {
-		select {
-		case c <- detectContectType(path):
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-func detectContectType(path string) string {
-	file, err := os.Open(path)
-	if err != nil {
-		fmt.Println(err)
-		return ""
-	}
-	defer file.Close()
-	buf := make([]byte, 512)
-	_, err = file.Read(buf)
-	if err != nil {
-		fmt.Println(err)
-		return ""
-	}
-
-	filetype := http.DetectContentType(buf)
-	switch filetype {
-	case "image/jpeg", "image/jpg":
-		return path
-	case "image/png":
-		return path
-	default:
-	}
-	return ""
-}
-
-func changeName(path string) string {
-	basename := filepath.Base(path)
-	fileExt := filepath.Ext(path)
-	fileDir := filepath.Dir(path)
-
-	filename := strings.TrimSuffix(basename, fileExt)
-	_, err := uuid.FromString(filename)
-	if err == nil {
-		return ""
-	}
-	u := uuid.NewV4()
-	newFilename := u.String() + fileExt
-	newPath := filepath.Join(fileDir, newFilename)
-	err = os.Rename(path, newPath)
-	if err != nil {
-		fmt.Println(err)
-		return ""
-	}
-	return newPath
 }
