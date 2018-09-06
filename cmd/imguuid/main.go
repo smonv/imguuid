@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/tthanh/imguuid"
+	"github.com/smonv/imguuid"
 )
 
 var (

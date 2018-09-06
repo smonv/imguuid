@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
+	"github.com/gofrs/uuid/v3"
 )
 
 // WalkFiles ...
@@ -47,7 +47,7 @@ func ChangeName(path string) string {
 	if err == nil {
 		return ""
 	}
-	u := uuid.NewV4()
+	u, _ := uuid.NewV4()
 	newFilename := u.String() + fileExt
 	newPath := filepath.Join(fileDir, newFilename)
 	err = os.Rename(path, newPath)
