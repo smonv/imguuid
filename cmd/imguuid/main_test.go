@@ -10,25 +10,27 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"imguuid"
 )
 
 func TestDetectContentType(t *testing.T) {
 	path := createPNG("testdct.png")
-	dPath := detectContectType(path)
+	dPath := imguuid.DetectContentType(path)
 	if len(dPath) == 0 {
 		t.Errorf("Cannot detect png file")
 	}
 	os.Remove(path)
 
 	path = createJPG("testdct.jpg")
-	dPath = detectContectType(path)
+	dPath = imguuid.DetectContentType(path)
 	if len(dPath) == 0 {
 		t.Errorf("Cannot detect jpg file")
 	}
 	os.Remove(path)
 
 	path = createText("testdct.txt")
-	dPath = detectContectType(path)
+	dPath = imguuid.DetectContentType(path)
 	if len(dPath) > 0 {
 		t.Errorf("Wrong detect, txt is not image file")
 	}
@@ -37,7 +39,7 @@ func TestDetectContentType(t *testing.T) {
 
 func TestChangeName(t *testing.T) {
 	path := createPNG("testCN.png")
-	newPath := changeName(path)
+	newPath := imguuid.ChangeName(path)
 
 	_, err := os.Stat(newPath)
 	if err != nil {
