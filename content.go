@@ -24,7 +24,9 @@ func detectContectType(path string) string {
 		fmt.Println(err)
 		return ""
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close()
+	}()
 	buf := make([]byte, 512)
 	_, err = file.Read(buf)
 	if err != nil {
@@ -41,4 +43,9 @@ func detectContectType(path string) string {
 	default:
 	}
 	return ""
+}
+
+// DetectContentType ...
+func DetectContentType(path string) string {
+	return detectContectType(path)
 }
